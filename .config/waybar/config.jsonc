@@ -244,7 +244,7 @@
         "higher_cutoff_freq": 10000,
         "method": "pipewire",
         "source": "auto",
-        "stereo": false,
+        "stereo": true,
         "bar_delimiter": 0,
         "noise_reduction": 0.77,
         "input_delay": 2,
