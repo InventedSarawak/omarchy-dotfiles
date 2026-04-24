@@ -1,0 +1,33 @@
+#!/bin/bash
+
+CHROME_BIN="/usr/bin/google-chrome-stable"
+
+url="$1"
+profile_raw="$2"
+
+# 1. Fallback: If $2 is empty, use $OMARCHY_PROFILE_DEFAULT
+# If that is also empty, it defaults to "Default"
+if [[ -z "$profile_raw" ]]; then
+    profile_raw="${OMARCHY_PROFILE_DEFAULT:-Default}"
+fi
+
+# 2. Expand literal env vars (e.g., "$OMARCHY_PROFILE_COLLEGE" passed from .desktop)
+if [[ "$profile_raw" == \$* ]]; then
+    var_name="${profile_raw:1}"
+    profile_raw="${!var_name}"
+fi
+
+# 3. Final validation and arg construction
+# Supports "Default" or "Profile X"
+profile_arg=""
+if [[ "$profile_raw" == "Default" || "$profile_raw" =~ ^Profile\ [0-9]+$ ]]; then
+    profile_arg="--profile-directory=$profile_raw"
+fi
+
+# 4. Launch in App Mode
+# --app=URL removes the address bar, tabs, and bookmarks ribbon
+exec "$CHROME_BIN" \
+    "$profile_arg" \
+    --app="$url" \
+    --new-window \
+    --no-first-run
