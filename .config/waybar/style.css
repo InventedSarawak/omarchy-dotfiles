@@ -254,17 +254,35 @@ window#waybar.hidden {
 }
 
 #mpris {
-    color: @sapphire;
+    color: @sapphire; 
     background-color: @crust;
     font-weight: bold;
 }
 
+/* Spotify Green */
+#mpris.spotify {
+    color: #1DB954; 
+}
+
+/* YouTube/Browser Red */
+#mpris.firefox, 
+#mpris.chromium, 
+#mpris.brave {
+    color: #FF0000;
+}
+
+/* VLC Orange */
+#mpris.vlc {
+    color: #FF8800;
+}
+
+/* Dim text when paused, regardless of player */
 #mpris.paused {
-    color: @subtext0;
+    color: @subtext0; 
 }
 
 #cava {
-    color: @flamingo;
+    color: @lavender;
     background-color: @crust;
 }
 
