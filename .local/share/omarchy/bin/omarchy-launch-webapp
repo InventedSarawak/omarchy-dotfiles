@@ -1,33 +1,67 @@
 #!/bin/bash
 
+# omarchy:summary=Launch a URL as a web app in a specific Chrome profile
+# omarchy:args=<url> [profile] [browser-flags...]
+#
+# Local override of the packaged /usr/bin/omarchy-launch-webapp.
+# Lives in /usr/local/bin so it wins over /usr/bin on PATH, with a symlink in
+# ~/.local/bin for interactive shells, where /usr/share/omarchy/bin (symlinks
+# into /usr/bin) would otherwise shadow it.
+
+set -uo pipefail
+
 CHROME_BIN="/usr/bin/google-chrome-stable"
 
+if (($# == 0)); then
+  echo "Usage: omarchy-launch-webapp <url> [profile] [browser-flags...]" >&2
+  exit 1
+fi
+
 url="$1"
-profile_raw="$2"
+shift
 
-# 1. Fallback: If $2 is empty, use $OMARCHY_PROFILE_DEFAULT
-# If that is also empty, it defaults to "Default"
-if [[ -z "$profile_raw" ]]; then
-    profile_raw="${OMARCHY_PROFILE_DEFAULT:-Default}"
-fi
+# 1. Sort the remaining arguments. Anything starting with "-" is a browser flag
+#    (the packaged script forwarded those); the rest is the profile name.
+#    Collecting the name in pieces keeps "Profile 2" intact even when a caller
+#    leaves it unquoted, or when a wrapper like omarchy-launch-or-focus-webapp
+#    re-splits its arguments through a string.
+profile_parts=()
+browser_flags=()
+for arg in "$@"; do
+  if [[ "$arg" == -* ]]; then
+    browser_flags+=("$arg")
+  else
+    profile_parts+=("$arg")
+  fi
+done
+profile_raw="${profile_parts[*]:-}"
 
-# 2. Expand literal env vars (e.g., "$OMARCHY_PROFILE_COLLEGE" passed from .desktop)
+# 2. Expand a literal env var name. .desktop Exec= lines get no shell expansion,
+#    so they arrive here as the unexpanded text "$OMARCHY_PROFILE_COLLEGE".
 if [[ "$profile_raw" == \$* ]]; then
-    var_name="${profile_raw:1}"
-    profile_raw="${!var_name}"
+  var_name="${profile_raw#\$}"
+  var_name="${var_name#\{}"
+  var_name="${var_name%\}}"
+  profile_raw="${!var_name:-}"
 fi
 
-# 3. Final validation and arg construction
-# Supports "Default" or "Profile X"
-profile_arg=""
+# 3. Fall back when no profile was given, or the named variable was unset.
+if [[ -z "$profile_raw" ]]; then
+  profile_raw="${OMARCHY_PROFILE_DEFAULT:-Default}"
+fi
+
+# 4. Build the argument list. At most one --profile-directory ever reaches
+#    Chrome, and an unset profile adds no argument at all -- passing an empty
+#    string would read as a second URL.
+chrome_args=()
 if [[ "$profile_raw" == "Default" || "$profile_raw" =~ ^Profile\ [0-9]+$ ]]; then
-    profile_arg="--profile-directory=$profile_raw"
+  chrome_args+=(--profile-directory="$profile_raw")
+else
+  echo "omarchy-launch-webapp: unknown profile '$profile_raw', using Chrome's last-used profile" >&2
 fi
 
-# 4. Launch in App Mode
-# --app=URL removes the address bar, tabs, and bookmarks ribbon
-exec "$CHROME_BIN" \
-    "$profile_arg" \
-    --app="$url" \
-    --new-window \
-    --no-first-run
+# 5. Launch in app mode: no address bar, tabs, or bookmarks ribbon.
+chrome_args+=(--app="$url" --new-window --no-first-run)
+chrome_args+=(${browser_flags[@]+"${browser_flags[@]}"})
+
+exec "$CHROME_BIN" "${chrome_args[@]}"
